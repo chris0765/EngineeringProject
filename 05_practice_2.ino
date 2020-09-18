@@ -15,9 +15,9 @@ void loop() {
   while(count++ < 5)
   {
     digitalWrite(7,1);
-    delay(200);
+    delay(100);
     digitalWrite(7,0);
-    delay(200);
+    delay(100);
   }
   digitalWrite(7,1);
   while(1){}

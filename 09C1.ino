@@ -9,7 +9,7 @@
 #define _DIST_MIN 100 // minimum distance to be measured (unit: mm)
 #define _DIST_MAX 300 // maximum distance to be measured (unit: mm)
 #define _DIST_ALPHA 0.1 // EMA weight of new sample (range: 0 to 1). Setting this value to 1 effectively disables EMA filter.
-#define N 30 //Num of samples
+#define N 3 //Num of samples
 
 // global variables
 float timeout; // unit: us
@@ -17,7 +17,7 @@ float dist_min, dist_max, dist_raw, dist_all, dist_med, alpha; // unit: mm
 unsigned long last_sampling_time; // unit: ms
 float scale; // used for pulse duration to distance conversion
 int nowN;
-float samples[10];
+float samples[30];
 
 void setup() {
 // initialize GPIO pins
@@ -51,19 +51,20 @@ void loop() {
 
 // get a distance reading from the USS
   dist_raw = USS_measure(PIN_TRIG,PIN_ECHO);
-  if(nowN<10){
+  if(nowN<N){
     samples[nowN]=dist_raw;
     dist_all+=dist_raw;
+    dist_med=dist_raw;
   }
   else{
-    dist_all-=samples[nowN%10];
+    dist_all-=samples[nowN%N];
     dist_all+=dist_raw;
-    samples[nowN%10]=dist_raw;
-    dist_med=dist_all/10;
+    samples[nowN%N]=dist_raw;
+    dist_med=dist_all/N;
   }
   nowN=nowN+1;
-  if(nowN>20){
-    nowN=nowN-10;
+  if(nowN>2*N){
+    nowN=nowN-N;
   }
   
 // output the read value to the serial port
@@ -77,7 +78,7 @@ void loop() {
   Serial.println("Max:500");
 
 // turn on the LED if the distance is between dist_min and dist_max
-  if(dist_raw < dist_min || dist_raw > dist_max) {
+  if(dist_med < dist_min || dist_med > dist_max) {
     analogWrite(PIN_LED, 255);
   }
   else {

@@ -71,11 +71,10 @@ void loop() {
   Serial.print("raw:");
   Serial.print(dist_raw);
   Serial.print(",");
-  Serial.print("med:");
-  Serial.println(dist_med);
-//  Serial.print(map(dist_med,0,400,100,500));
-  //Serial.print(",");
-  //Serial.println("Max:500");
+  Serial.print("median:");
+  Serial.print(map(dist_med,0,400,100,500));
+  Serial.print(",");
+  Serial.println("Max:500");
 
 // turn on the LED if the distance is between dist_min and dist_max
   if(dist_raw < dist_min || dist_raw > dist_max) {

@@ -18,9 +18,9 @@
 #define _DIST_ALPHA 0.3  // [3162] ema 필터의 alpha 값을 0.0으로 설정
 
 // Servo range
-#define _DUTY_MIN 1600    //[3148]  서보의 가동 최소 각도(0)
+#define _DUTY_MIN 1700    //[3148]  서보의 가동 최소 각도(0)
 #define _DUTY_NEU 1800      //[3150] servo neutral position (90 degree)
-#define _DUTY_MAX 2000                // [3169] 서보의 최대 가동 각도(180º)
+#define _DUTY_MAX 1900                // [3169] 서보의 최대 가동 각도(180º)
 
 // Servo speed control
 #define _SERVO_ANGLE 20   //[3159] 서보의 각도(30º) 
@@ -33,7 +33,7 @@
 #define _INTERVAL_SERIAL 100  // [3151] 시리얼 0.1초 마다 업데이트
 
 // PID parameters
-#define _KP 1.5      // [3158] 비례상수 설정
+#define _KP 4.5      // [3158] 비례상수 설정
 
 int a, b;
 
@@ -146,17 +146,13 @@ void loop() {
   if(event_serial) {
     event_serial = false; // [3153] serial EventHandler Ticket -> false
     Serial.print("dist_ir:");
-    Serial.print(dist_raw);
-    Serial.print(",dist_cali:");
-    Serial.print(dist_cali);
-    Serial.print(",dist_ema:");
     Serial.print(dist_ema);
     Serial.print(",pterm:");
-    Serial.print(pterm);
+    Serial.print(map(pterm,-1000,1000,-155,155));
     Serial.print(",duty_target:");
-    Serial.print(duty_target);
+    Serial.print(map(duty_target,1000,2000,410,510));
     Serial.print(",duty_curr:");
-    Serial.print(duty_curr);
+    Serial.print(map(duty_curr,1000,2000,410,510));
     Serial.println(",Min:100,Low:200,dist_target:255,High:310,Max:410");
   }
 }
@@ -177,18 +173,15 @@ float ir_distance_filtered(void){ // return value unit: mm
   else{
     dist_ema = (_DIST_ALPHA * dist_cali) + (1 - _DIST_ALPHA) * dist_ema;
   }
-  return dist_ema-10; // for now, just use ir_distance() without noise filter.
+  return dist_ema; // for now, just use ir_distance() without noise filter.
 }
 
 float dist_calc(float dist_value){
   if(dist_raw<=255){
     return constrain(100 + 100.0 / (255 - 93) * (dist_raw - 93), 100, 200);
   }
-  else if(dist_raw<=380){
-    return constrain(200 + 55.0 / (380 - 255) * (dist_raw - 255), 200, 255);
-  }
   else if(dist_raw<=509){
-    return constrain(255 + 55.0 / (509 - 380) * (dist_raw - 380), 255, 310);
+    return constrain(200 + 110.0 / (509 - 255) * (dist_raw - 255), 200, 310);
   }
   else if(dist_raw<=1000){
     return constrain(310 + 90.0 / (1000 - 509) * (dist_raw - 509), 310, 400);
@@ -199,5 +192,5 @@ float dist_calc(float dist_value){
 }
 
 float f(float control){
-  return _DUTY_NEU + map(control, 155, -155, 200, -200);
+  return _DUTY_NEU + map(control, 155, -155, _DUTY_MAX - _DUTY_NEU, _DUTY_MIN - _DUTY_NEU) - 100 * constrain(control, -5, 5) / 5;
 }

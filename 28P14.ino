@@ -15,17 +15,19 @@
 #define _DIST_MAX 410   // [3401] 측정 거리의 최댓값를 410mm로 설정
 
 // Distance sensor
-#define _DIST_ALPHA 0.1  // [3162] ema 필터의 alpha 값을 0.0으로 설정
+#define _DIST_ALPHA 0.2  // [3162] ema 필터의 alpha 값을 0.0으로 설정
+#define _KD_ALPHA 0.3
+#define DELAY_MICROS 1500
 
 // Servo range
-#define _DUTY_MIN 1620   //[3148]  서보의 가동 최소 각도(0)
-#define _DUTY_NEU 1920    //[3150] servo neutral position (90 degree)
-#define _DUTY_MAX 2220               // [3169] 서보의 최대 가동 각도(180º)
+#define _DUTY_MIN 1615   //[3148]  서보의 가동 최소 각도(0)
+#define _DUTY_NEU 1915    //[3150] servo neutral position (90 degree)
+#define _DUTY_MAX 2215               // [3169] 서보의 최대 가동 각도(180º)
 
 // Servo speed control
 #define _SERVO_ANGLE 20   //[3159] 서보의 각도(30º) 
 //[3150] 레일플레이트가 사용자가 원하는 가동범위를 움직일때, 이를 움직이게 하는 서보모터의 가동범위
-#define _SERVO_SPEED 53//[3147]  서보 속도를 30으로 설정
+#define _SERVO_SPEED 40//[3147]  서보 속도를 30으로 설정
 
 // Event periods
 #define _INTERVAL_DIST 20   // [3153] Distance Sensing을 20(ms) 마다 실행한다.
@@ -34,10 +36,9 @@
 
 // PID parameters
 #define _KP 2      // [3158] 비례상수 설정
-#define _KD 110
-#define _KI 0.003
+#define _KD 120
+#define _KI 0.0035
 
-int a, b;
 
 
 //////////////////////
@@ -60,6 +61,7 @@ int duty_target, duty_curr;    // [3157] 서보의 목표위치와 서보에 실
 
 // PID variables
 float error_curr, error_prev, control, pterm, dterm, dterm_prev=-1000, iterm; // [3401] 비례 제어를 위한 전에 측정한 오차, 새로 측정한 오차 값, 비례항, 적분항, 미분항 변수
+float samples_num = 3;
 
 
 void setup() {
@@ -79,9 +81,8 @@ void setup() {
 // convert angle speed into duty change per interval.
   duty_chg_per_interval = int((_DUTY_MAX - _DUTY_MIN) * (_SERVO_SPEED /  _SERVO_ANGLE) * (float(_INTERVAL_SERVO) / 1000.0));   //[3159] 서보 각속도에 맞추어 센서 인식 간격 변경? [3150] 서보의 각속도를 원하는 Angle로 나누어 interval을 설정한다.
 
-  a = 90;
-  b = 1000;
   pterm=dterm=iterm=duty_curr=0;
+  iterm=-0.5;
 }
   
 
@@ -116,9 +117,8 @@ void loop() {
   // PID control logic
     error_curr = _DIST_TARGET - dist_filtered; // [3158] 목표값 에서 현재값을 뺀 값이 오차값
     pterm = _KP*error_curr;
-    dterm = _KD*(error_curr - error_prev);
-    if(abs(dterm)>500)
-      dterm=500*(dterm/abs(dterm));
+    //dterm = _KD*(error_curr - error_prev);
+    dterm = (_KD_ALPHA * _KD*(error_curr - error_prev)) + (1 - _KD_ALPHA) * dterm;
     /*if(abs(error_curr)<1)
     {
       dterm=0;
@@ -186,8 +186,26 @@ float ir_distance(void){ // return value unit: mm
   return val;         //[3150] 적외선 센서를 통해 거리를 return시킨다.
 }
 
+float under_noise_filter(void){ // 아래로 떨어지는 형태의 스파이크를 제거해주는 필터
+  int currReading;
+  int largestReading = 0;
+  for (int i = 0; i < samples_num; i++) {
+    currReading = ir_distance();
+    if (currReading > largestReading) { largestReading = currReading; }
+    // Delay a short time before taking another reading
+    delayMicroseconds(DELAY_MICROS);
+  }
+  return largestReading;
+}
+
 float ir_distance_filtered(void){ // return value unit: mm
-  dist_raw = ir_distance();
+  int currReading;
+  int lowestReading = 1024;
+  for (int i = 0; i < samples_num; i++) {
+    currReading = under_noise_filter();
+    if (currReading < lowestReading) { lowestReading = currReading; }
+  }
+  dist_raw = lowestReading;
   dist_cali = dist_calc(dist_raw);
   if(dist_ema <= 0 || dist_ema >= 500){
     dist_ema = dist_cali;
